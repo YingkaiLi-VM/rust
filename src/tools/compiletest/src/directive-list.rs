@@ -205,6 +205,7 @@ const KNOWN_DIRECTIVE_NAMES: &[&str] = &[
     "only-nightly",
     "only-nvptx64",
     "only-powerpc",
+    "only-riscv32",
     "only-riscv64",
     "only-rustc_abi-x86-sse2",
     "only-s390x",

@@ -8,11 +8,12 @@
 // Some attributes are only computed for release builds:
 //@ compile-flags: -O
 //@ add-core-stubs
-//@ revisions: riscv64 aarch64 riscv32 x86_64
+//@ revisions: riscv64 aarch64 riscv32 x86_64 x86
 //@ [riscv64] only-riscv64
 //@ [aarch64] only-aarch64
 //@ [riscv32] only-riscv32
 //@ [x86_64]  only-x86_64
+//@ [x86] only-x86
 #![feature(rustc_attrs)]
 #![crate_type = "lib"]
 

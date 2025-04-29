@@ -1026,7 +1026,7 @@ pub enum AliasKind {
     Projection,
     Inherent,
     Opaque,
-    Weak,
+    Free,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -1462,7 +1462,7 @@ pub enum ClauseKind {
     TypeOutlives(TypeOutlivesPredicate),
     Projection(ProjectionPredicate),
     ConstArgHasType(TyConst, Ty),
-    WellFormed(GenericArgKind),
+    WellFormed(TermKind),
     ConstEvaluatable(TyConst),
 }
 

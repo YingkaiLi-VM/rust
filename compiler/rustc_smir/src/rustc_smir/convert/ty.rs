@@ -16,7 +16,7 @@ impl<'tcx> Stable<'tcx> for ty::AliasTyKind {
             ty::Projection => stable_mir::ty::AliasKind::Projection,
             ty::Inherent => stable_mir::ty::AliasKind::Inherent,
             ty::Opaque => stable_mir::ty::AliasKind::Opaque,
-            ty::Weak => stable_mir::ty::AliasKind::Weak,
+            ty::Free => stable_mir::ty::AliasKind::Free,
         }
     }
 }
@@ -638,8 +638,8 @@ impl<'tcx> Stable<'tcx> for ty::ClauseKind<'tcx> {
                 const_.stable(tables),
                 ty.stable(tables),
             ),
-            ClauseKind::WellFormed(generic_arg) => {
-                stable_mir::ty::ClauseKind::WellFormed(generic_arg.unpack().stable(tables))
+            ClauseKind::WellFormed(term) => {
+                stable_mir::ty::ClauseKind::WellFormed(term.unpack().stable(tables))
             }
             ClauseKind::ConstEvaluatable(const_) => {
                 stable_mir::ty::ClauseKind::ConstEvaluatable(const_.stable(tables))
@@ -813,6 +813,8 @@ impl<'tcx> Stable<'tcx> for ty::Instance<'tcx> {
             | ty::InstanceKind::DropGlue(..)
             | ty::InstanceKind::CloneShim(..)
             | ty::InstanceKind::FnPtrShim(..)
+            | ty::InstanceKind::FutureDropPollShim(..)
+            | ty::InstanceKind::AsyncDropGlue(..)
             | ty::InstanceKind::AsyncDropGlueCtorShim(..) => {
                 stable_mir::mir::mono::InstanceKind::Shim
             }

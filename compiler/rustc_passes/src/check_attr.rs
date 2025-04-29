@@ -179,6 +179,9 @@ impl<'tcx> CheckAttrVisitor<'tcx> {
                         [sym::rustc_as_ptr, ..] => {
                             self.check_applied_to_fn_or_method(hir_id, attr, span, target)
                         }
+                        [sym::rustc_no_implicit_autorefs, ..] => {
+                            self.check_applied_to_fn_or_method(hir_id, attr, span, target)
+                        }
                         [sym::rustc_never_returns_null_ptr, ..] => {
                             self.check_applied_to_fn_or_method(hir_id, attr, span, target)
                         }
@@ -680,10 +683,14 @@ impl<'tcx> CheckAttrVisitor<'tcx> {
                     }
 
                     if !other_attr.has_any_name(ALLOW_LIST) {
+                        let path = other_attr.path();
+                        let path: Vec<_> = path.iter().map(|s| s.as_str()).collect();
+                        let other_attr_name = path.join("::");
+
                         self.dcx().emit_err(errors::NakedFunctionIncompatibleAttribute {
                             span: other_attr.span(),
                             naked_span: attr.span(),
-                            attr: other_attr.name().unwrap(),
+                            attr: other_attr_name,
                         });
 
                         return;

@@ -1,4 +1,5 @@
 // tidy-alphabetical-start
+#![cfg_attr(bootstrap, feature(let_chains))]
 #![feature(array_windows)]
 #![feature(assert_matches)]
 #![feature(box_patterns)]
@@ -7,7 +8,6 @@
 #![feature(file_buffered)]
 #![feature(if_let_guard)]
 #![feature(impl_trait_in_assoc_type)]
-#![feature(let_chains)]
 #![feature(map_try_insert)]
 #![feature(never_type)]
 #![feature(try_blocks)]
@@ -652,7 +652,7 @@ fn run_runtime_cleanup_passes<'tcx>(tcx: TyCtxt<'tcx>, body: &mut Body<'tcx>) {
     }
 }
 
-fn run_optimization_passes<'tcx>(tcx: TyCtxt<'tcx>, body: &mut Body<'tcx>) {
+pub(crate) fn run_optimization_passes<'tcx>(tcx: TyCtxt<'tcx>, body: &mut Body<'tcx>) {
     fn o1<T>(x: T) -> WithMinOptLevel<T> {
         WithMinOptLevel(1, x)
     }

@@ -6,7 +6,7 @@ mod opaque_types;
 use rustc_type_ir::fast_reject::DeepRejectCtxt;
 use rustc_type_ir::inherent::*;
 use rustc_type_ir::lang_items::TraitSolverLangItem;
-use rustc_type_ir::{self as ty, Interner, NormalizesTo, Upcast as _};
+use rustc_type_ir::{self as ty, Interner, NormalizesTo, PredicateKind, Upcast as _};
 use tracing::instrument;
 
 use crate::delegate::SolverDelegate;
@@ -48,9 +48,13 @@ where
                     })
                 })
             }
-            ty::AliasTermKind::InherentTy => self.normalize_inherent_associated_type(goal),
+            ty::AliasTermKind::InherentTy | ty::AliasTermKind::InherentConst => {
+                self.normalize_inherent_associated_term(goal)
+            }
             ty::AliasTermKind::OpaqueTy => self.normalize_opaque_type(goal),
-            ty::AliasTermKind::FreeTy => self.normalize_free_alias(goal),
+            ty::AliasTermKind::FreeTy | ty::AliasTermKind::FreeConst => {
+                self.normalize_free_alias(goal)
+            }
             ty::AliasTermKind::UnevaluatedConst => self.normalize_anon_const(goal),
         }
     }
@@ -194,6 +198,12 @@ where
                 .map(|pred| goal.with(cx, pred));
             ecx.add_goals(GoalSource::ImplWhereBound, where_clause_bounds);
 
+            // Bail if the nested goals don't hold here. This is to avoid unnecessarily
+            // computing the `type_of` query for associated types that never apply, as
+            // this may result in query cycles in the case of RPITITs.
+            // See <https://github.com/rust-lang/trait-system-refactor-initiative/issues/185>.
+            ecx.try_evaluate_added_goals()?;
+
             // Add GAT where clauses from the trait's definition.
             // FIXME: We don't need these, since these are the type's own WF obligations.
             ecx.add_goals(
@@ -221,13 +231,21 @@ where
                 Ok(Some(target_item_def_id)) => target_item_def_id,
                 Ok(None) => {
                     match ecx.typing_mode() {
-                        // In case the associated item is hidden due to specialization, we have to
-                        // return ambiguity this would otherwise be incomplete, resulting in
-                        // unsoundness during coherence (#105782).
+                        // In case the associated item is hidden due to specialization,
+                        // normalizing this associated item is always ambiguous. Treating
+                        // the associated item as rigid would be incomplete and allow for
+                        // overlapping impls, see #105782.
+                        //
+                        // As this ambiguity is unavoidable we emit a nested ambiguous
+                        // goal instead of using `Certainty::AMBIGUOUS`. This allows us to
+                        // return the nested goals to the parent `AliasRelate` goal. This
+                        // would be relevant if any of the nested goals refer to the `term`.
+                        // This is not the case here and we only prefer adding an ambiguous
+                        // nested goal for consistency.
                         ty::TypingMode::Coherence => {
-                            return ecx.evaluate_added_goals_and_make_canonical_response(
-                                Certainty::AMBIGUOUS,
-                            );
+                            ecx.add_goal(GoalSource::Misc, goal.with(cx, PredicateKind::Ambiguous));
+                            return ecx
+                                .evaluate_added_goals_and_make_canonical_response(Certainty::Yes);
                         }
                         // Outside of coherence, we treat the associated item as rigid instead.
                         ty::TypingMode::Analysis { .. }
@@ -254,10 +272,20 @@ where
                 // treat it as rigid.
                 if cx.impl_self_is_guaranteed_unsized(impl_def_id) {
                     match ecx.typing_mode() {
+                        // Trying to normalize such associated items is always ambiguous
+                        // during coherence to avoid cyclic reasoning. See the example in
+                        // tests/ui/traits/trivial-unsized-projection-in-coherence.rs.
+                        //
+                        // As this ambiguity is unavoidable we emit a nested ambiguous
+                        // goal instead of using `Certainty::AMBIGUOUS`. This allows us to
+                        // return the nested goals to the parent `AliasRelate` goal. This
+                        // would be relevant if any of the nested goals refer to the `term`.
+                        // This is not the case here and we only prefer adding an ambiguous
+                        // nested goal for consistency.
                         ty::TypingMode::Coherence => {
-                            return ecx.evaluate_added_goals_and_make_canonical_response(
-                                Certainty::AMBIGUOUS,
-                            );
+                            ecx.add_goal(GoalSource::Misc, goal.with(cx, PredicateKind::Ambiguous));
+                            return ecx
+                                .evaluate_added_goals_and_make_canonical_response(Certainty::Yes);
                         }
                         ty::TypingMode::Analysis { .. }
                         | ty::TypingMode::Borrowck { .. }
@@ -309,6 +337,8 @@ where
                     cx.type_of(target_item_def_id).map_bound(|ty| ty.into())
                 }
                 ty::AliasTermKind::ProjectionConst => {
+                    // FIXME(mgca): once const items are actual aliases defined as equal to type system consts
+                    // this should instead return that.
                     if cx.features().associated_const_equality() {
                         panic!("associated const projection is not supported yet")
                     } else {

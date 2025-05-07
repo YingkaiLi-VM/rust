@@ -221,6 +221,7 @@ pub struct State<'a> {
     pub s: pp::Printer,
     comments: Option<Comments<'a>>,
     ann: &'a (dyn PpAnn + 'a),
+    is_sdylib_interface: bool,
 }
 
 const INDENT_UNIT: isize = 4;
@@ -237,8 +238,40 @@ pub fn print_crate<'a>(
     edition: Edition,
     g: &AttrIdGenerator,
 ) -> String {
+    let mut s = State {
+        s: pp::Printer::new(),
+        comments: Some(Comments::new(sm, filename, input)),
+        ann,
+        is_sdylib_interface: false,
+    };
+
+    print_crate_inner(&mut s, krate, is_expanded, edition, g);
+    s.s.eof()
+}
+
+pub fn print_crate_as_interface(
+    krate: &ast::Crate,
+    edition: Edition,
+    g: &AttrIdGenerator,
+) -> String {
     let mut s =
-        State { s: pp::Printer::new(), comments: Some(Comments::new(sm, filename, input)), ann };
+        State { s: pp::Printer::new(), comments: None, ann: &NoAnn, is_sdylib_interface: true };
+
+    print_crate_inner(&mut s, krate, false, edition, g);
+    s.s.eof()
+}
+
+fn print_crate_inner<'a>(
+    s: &mut State<'a>,
+    krate: &ast::Crate,
+    is_expanded: bool,
+    edition: Edition,
+    g: &AttrIdGenerator,
+) {
+    // We need to print shebang before anything else
+    // otherwise the resulting code will not compile
+    // and shebang will be useless.
+    s.maybe_print_shebang();
 
     if is_expanded && !krate.attrs.iter().any(|attr| attr.has_name(sym::no_core)) {
         // We need to print `#![no_std]` (and its feature gate) so that
@@ -277,8 +310,7 @@ pub fn print_crate<'a>(
         s.print_item(item);
     }
     s.print_remaining_comments();
-    s.ann.post(&mut s, AnnNode::Crate(krate));
-    s.s.eof()
+    s.ann.post(s, AnnNode::Crate(krate));
 }
 
 /// Should two consecutive tokens be printed with a space between them?
@@ -560,6 +592,20 @@ pub trait PrintState<'a>: std::ops::Deref<Target = pp::Printer> + std::ops::Dere
         self.word(st)
     }
 
+    fn maybe_print_shebang(&mut self) {
+        if let Some(cmnt) = self.peek_comment() {
+            // Comment is a shebang if it's:
+            // Isolated, starts with #! and doesn't continue with `[`
+            // See [rustc_lexer::strip_shebang] and [gather_comments] from pprust/state.rs for details
+            if cmnt.style == CommentStyle::Isolated
+                && cmnt.lines.first().map_or(false, |l| l.starts_with("#!"))
+            {
+                let cmnt = self.next_comment().unwrap();
+                self.print_comment(cmnt);
+            }
+        }
+    }
+
     fn print_inner_attributes(&mut self, attrs: &[ast::Attribute]) -> bool {
         self.print_either_attributes(attrs, ast::AttrStyle::Inner, false, true)
     }
@@ -634,6 +680,7 @@ pub trait PrintState<'a>: std::ops::Deref<Target = pp::Printer> + std::ops::Dere
                 false,
                 None,
                 *delim,
+                None,
                 tokens,
                 true,
                 span,
@@ -679,6 +726,7 @@ pub trait PrintState<'a>: std::ops::Deref<Target = pp::Printer> + std::ops::Dere
                     false,
                     None,
                     *delim,
+                    Some(spacing.open),
                     tts,
                     convert_dollar_crate,
                     dspan.entire(),
@@ -735,6 +783,7 @@ pub trait PrintState<'a>: std::ops::Deref<Target = pp::Printer> + std::ops::Dere
         has_bang: bool,
         ident: Option<Ident>,
         delim: Delimiter,
+        open_spacing: Option<Spacing>,
         tts: &TokenStream,
         convert_dollar_crate: bool,
         span: Span,
@@ -758,16 +807,26 @@ pub trait PrintState<'a>: std::ops::Deref<Target = pp::Printer> + std::ops::Dere
                     self.nbsp();
                 }
                 self.word("{");
-                if !tts.is_empty() {
+
+                // Respect `Alone`, if provided, and print a space. Unless the list is empty.
+                let open_space = (open_spacing == None || open_spacing == Some(Spacing::Alone))
+                    && !tts.is_empty();
+                if open_space {
                     self.space();
                 }
                 let ib = self.ibox(0);
                 self.print_tts(tts, convert_dollar_crate);
                 self.end(ib);
-                let empty = tts.is_empty();
-                self.bclose(span, empty, cb.unwrap());
+
+                // Use `open_space` for the spacing *before* the closing delim.
+                // Because spacing on delimiters is lost when going through
+                // proc macros, and otherwise we can end up with ugly cases
+                // like `{ x}`. Symmetry is better.
+                self.bclose(span, !open_space, cb.unwrap());
             }
             delim => {
+                // `open_spacing` is ignored. We never print spaces after
+                // non-brace opening delims or before non-brace closing delims.
                 let token_str = self.token_kind_to_string(&delim.as_open_token_kind());
                 self.word(token_str);
                 let ib = self.ibox(0);
@@ -797,6 +856,7 @@ pub trait PrintState<'a>: std::ops::Deref<Target = pp::Printer> + std::ops::Dere
             has_bang,
             Some(*ident),
             macro_def.body.delim,
+            None,
             &macro_def.body.tokens,
             true,
             sp,
@@ -844,9 +904,9 @@ pub trait PrintState<'a>: std::ops::Deref<Target = pp::Printer> + std::ops::Dere
         self.end(ib);
     }
 
-    fn bclose_maybe_open(&mut self, span: rustc_span::Span, empty: bool, cb: Option<BoxMarker>) {
+    fn bclose_maybe_open(&mut self, span: rustc_span::Span, no_space: bool, cb: Option<BoxMarker>) {
         let has_comment = self.maybe_print_comment(span.hi());
-        if !empty || has_comment {
+        if !no_space || has_comment {
             self.break_offset_if_not_bol(1, -INDENT_UNIT);
         }
         self.word("}");
@@ -855,9 +915,9 @@ pub trait PrintState<'a>: std::ops::Deref<Target = pp::Printer> + std::ops::Dere
         }
     }
 
-    fn bclose(&mut self, span: rustc_span::Span, empty: bool, cb: BoxMarker) {
+    fn bclose(&mut self, span: rustc_span::Span, no_space: bool, cb: BoxMarker) {
         let cb = Some(cb);
-        self.bclose_maybe_open(span, empty, cb)
+        self.bclose_maybe_open(span, no_space, cb)
     }
 
     fn break_offset_if_not_bol(&mut self, n: usize, off: isize) {
@@ -1078,7 +1138,7 @@ impl<'a> PrintState<'a> for State<'a> {
 
 impl<'a> State<'a> {
     pub fn new() -> State<'a> {
-        State { s: pp::Printer::new(), comments: None, ann: &NoAnn }
+        State { s: pp::Printer::new(), comments: None, ann: &NoAnn, is_sdylib_interface: false }
     }
 
     fn commasep_cmnt<T, F, G>(&mut self, b: Breaks, elts: &[T], mut op: F, mut get_span: G)
@@ -1156,6 +1216,17 @@ impl<'a> State<'a> {
                         self.word("=");
                     }
                     self.print_expr_anon_const(end, &[]);
+                }
+            }
+            rustc_ast::TyPatKind::Or(variants) => {
+                let mut first = true;
+                for pat in variants {
+                    if first {
+                        first = false
+                    } else {
+                        self.word(" | ");
+                    }
+                    self.print_ty_pat(pat);
                 }
             }
             rustc_ast::TyPatKind::Err(_) => {
@@ -1423,8 +1494,8 @@ impl<'a> State<'a> {
             }
         }
 
-        let empty = !has_attrs && blk.stmts.is_empty();
-        self.bclose_maybe_open(blk.span, empty, cb);
+        let no_space = !has_attrs && blk.stmts.is_empty();
+        self.bclose_maybe_open(blk.span, no_space, cb);
         self.ann.post(self, AnnNode::Block(blk))
     }
 
@@ -1471,6 +1542,7 @@ impl<'a> State<'a> {
             true,
             None,
             m.args.delim,
+            None,
             &m.args.tokens,
             true,
             m.span(),

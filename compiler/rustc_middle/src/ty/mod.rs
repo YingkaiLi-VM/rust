@@ -52,6 +52,7 @@ pub use rustc_session::lint::RegisteredTools;
 use rustc_span::hygiene::MacroKind;
 use rustc_span::{DUMMY_SP, ExpnId, ExpnKind, Ident, Span, Symbol, kw, sym};
 pub use rustc_type_ir::data_structures::{DelayedMap, DelayedSet};
+pub use rustc_type_ir::fast_reject::DeepRejectCtxt;
 #[allow(
     hidden_glob_reexports,
     rustc::usage_of_type_ir_inherent,
@@ -309,7 +310,10 @@ impl Visibility {
                 } else if restricted_id == tcx.parent_module_from_def_id(def_id).to_local_def_id() {
                     "pub(self)".to_string()
                 } else {
-                    format!("pub({})", tcx.item_name(restricted_id.to_def_id()))
+                    format!(
+                        "pub(in crate{})",
+                        tcx.def_path(restricted_id.to_def_id()).to_string_no_crate_verbose()
+                    )
                 }
             }
             ty::Visibility::Public => "pub".to_string(),
@@ -1921,6 +1925,9 @@ impl<'tcx> TyCtxt<'tcx> {
         def_id: DefId,
         args: GenericArgsRef<'tcx>,
     ) -> Option<&'tcx CoroutineLayout<'tcx>> {
+        if args[0].has_placeholders() || args[0].has_non_region_param() {
+            return None;
+        }
         let instance = InstanceKind::AsyncDropGlue(def_id, Ty::new_coroutine(self, def_id, args));
         self.mir_shims(instance).coroutine_layout_raw()
     }

@@ -7,7 +7,6 @@
 // tidy-alphabetical-start
 #![allow(internal_features)]
 #![allow(rustc::untranslatable_diagnostic)] // FIXME: make this translatable
-#![cfg_attr(bootstrap, feature(let_chains))]
 #![doc(html_root_url = "https://doc.rust-lang.org/nightly/nightly-rustc/")]
 #![doc(rust_logo)]
 #![feature(decl_macro)]
@@ -463,6 +462,7 @@ fn handle_explain(early_dcx: &EarlyDiagCtxt, registry: Registry, code: &str, col
     // Allow "E0123" or "0123" form.
     let upper_cased_code = code.to_ascii_uppercase();
     if let Ok(code) = upper_cased_code.strip_prefix('E').unwrap_or(&upper_cased_code).parse::<u32>()
+        && code <= ErrCode::MAX_AS_U32
         && let Ok(description) = registry.try_find_description(ErrCode::from_u32(code))
     {
         let mut is_in_code_block = false;

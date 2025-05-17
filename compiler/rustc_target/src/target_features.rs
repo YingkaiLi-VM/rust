@@ -393,6 +393,7 @@ static X86_FEATURES: &[(&str, Stability, ImpliedFeatures)] = &[
     ("amx-tf32", Unstable(sym::x86_amx_intrinsics), &["amx-tile"]),
     ("amx-tile", Unstable(sym::x86_amx_intrinsics), &[]),
     ("amx-transpose", Unstable(sym::x86_amx_intrinsics), &["amx-tile"]),
+    ("apxf", Unstable(sym::apx_target_feature), &[]),
     ("avx", Stable, &["sse4.2"]),
     (
         "avx10.1",
@@ -692,17 +693,17 @@ static CSKY_FEATURES: &[(&str, Stability, ImpliedFeatures)] = &[
 
 static LOONGARCH_FEATURES: &[(&str, Stability, ImpliedFeatures)] = &[
     // tidy-alphabetical-start
-    ("d", Unstable(sym::loongarch_target_feature), &["f"]),
+    ("d", Stable, &["f"]),
     ("div32", Unstable(sym::loongarch_target_feature), &[]),
-    ("f", Unstable(sym::loongarch_target_feature), &[]),
-    ("frecipe", Unstable(sym::loongarch_target_feature), &[]),
+    ("f", Stable, &[]),
+    ("frecipe", Stable, &[]),
     ("lam-bh", Unstable(sym::loongarch_target_feature), &[]),
     ("lamcas", Unstable(sym::loongarch_target_feature), &[]),
-    ("lasx", Unstable(sym::loongarch_target_feature), &["lsx"]),
-    ("lbt", Unstable(sym::loongarch_target_feature), &[]),
+    ("lasx", Stable, &["lsx"]),
+    ("lbt", Stable, &[]),
     ("ld-seq-sa", Unstable(sym::loongarch_target_feature), &[]),
-    ("lsx", Unstable(sym::loongarch_target_feature), &["d"]),
-    ("lvz", Unstable(sym::loongarch_target_feature), &[]),
+    ("lsx", Stable, &["d"]),
+    ("lvz", Stable, &[]),
     ("relax", Unstable(sym::loongarch_target_feature), &[]),
     ("scq", Unstable(sym::loongarch_target_feature), &[]),
     ("ual", Unstable(sym::loongarch_target_feature), &[]),

@@ -2465,6 +2465,9 @@ impl<'a> Parser<'a> {
     ) -> PResult<'a, (Ident, FnSig, Generics, Option<Box<FnContract>>, Option<Box<Block>>)> {
         let fn_span = self.token.span;
         let header = self.parse_fn_front_matter(vis, case, FrontMatterParsingMode::Function)?; // `const ... fn`
+        if header.is_dag {
+            self.psess.gated_spans.gate(sym::dag_fn , fn_span);
+        }
         let ident = self.parse_ident()?; // `foo`
         let mut generics = self.parse_generics()?; // `<'a, T, ...>`
         let decl = match self.parse_fn_decl(&fn_parse_mode, AllowPlus::Yes, RecoverReturnSign::Yes)
@@ -2632,6 +2635,7 @@ impl<'a> Parser<'a> {
         const ALL_QUALS: &[ExpKeywordPair] = &[
             exp!(Pub),
             exp!(Gen),
+            exp!(Dag),
             exp!(Const),
             exp!(Async),
             exp!(Unsafe),
@@ -2646,7 +2650,7 @@ impl<'a> Parser<'a> {
         let quals: &[_] = if check_pub {
             ALL_QUALS
         } else {
-            &[exp!(Gen), exp!(Const), exp!(Async), exp!(Unsafe), exp!(Safe), exp!(Extern)]
+            &[exp!(Gen), exp!(Const), exp!(Dag), exp!(Async), exp!(Unsafe), exp!(Safe), exp!(Extern)]
         };
         self.check_keyword_case(exp!(Fn), case) // Definitely an `fn`.
             // `$qual fn` or `$qual $qual`:
@@ -2730,6 +2734,7 @@ impl<'a> Parser<'a> {
         parsing_mode: FrontMatterParsingMode,
     ) -> PResult<'a, FnHeader> {
         let sp_start = self.token.span;
+        let is_dag = self.eat_keyword_case(exp!(Dag), case);
         let constness = self.parse_constness(case);
         if parsing_mode == FrontMatterParsingMode::FunctionPtrType
             && let Const::Yes(const_span) = constness
@@ -2799,7 +2804,11 @@ impl<'a> Parser<'a> {
                     let mut recover_safety = safety;
                     // This will allow the machine fix to directly place the keyword in the correct place or to indicate
                     // that the keyword is already present and the second instance should be removed.
-                    let wrong_kw = if self.check_keyword(exp!(Const)) {
+                    let wrong_kw = if self.check_keyword(exp!(Dag)) && is_dag{
+                        Some(WrongKw::Duplicated(sp_start))
+                    } else if self.check_keyword(exp!(Dag)) && !is_dag {
+                        Some(WrongKw::Misplaced(sp_start))
+                    }else if self.check_keyword(exp!(Const)) {
                         match constness {
                             Const::Yes(sp) => Some(WrongKw::Duplicated(sp)),
                             Const::No => {
@@ -2975,6 +2984,7 @@ impl<'a> Parser<'a> {
                             safety: recover_safety,
                             coroutine_kind: recover_coroutine_kind,
                             ext,
+                            is_dag,
                         });
                     }
 
@@ -2983,7 +2993,7 @@ impl<'a> Parser<'a> {
             }
         }
 
-        Ok(FnHeader { constness, safety, coroutine_kind, ext })
+        Ok(FnHeader { constness, safety, coroutine_kind, ext,is_dag })
     }
 
     /// Parses the parameter list and result type of a function declaration.

@@ -624,7 +624,7 @@ impl<'a> AstValidator<'a> {
     fn check_foreign_fn_headerless(
         &self,
         // Deconstruct to ensure exhaustiveness
-        FnHeader { safety: _, coroutine_kind, constness, ext }: FnHeader,
+        FnHeader { safety: _, coroutine_kind, constness, ext ,is_dag:_}: FnHeader,
     ) {
         let report_err = |span, kw| {
             self.dcx().emit_err(errors::FnQualifierInExtern {

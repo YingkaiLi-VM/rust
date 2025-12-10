@@ -87,6 +87,7 @@ pub enum TokenType {
     KwContractRequires,
     KwCrate,
     KwDefault,
+    KwDag,
     KwDyn,
     KwElse,
     KwEnum,
@@ -518,6 +519,7 @@ macro_rules! exp {
     (Crate)          => { exp!(@kw, Crate,      KwCrate) };
     (Default)        => { exp!(@kw, Default,    KwDefault) };
     (Dyn)            => { exp!(@kw, Dyn,        KwDyn) };
+    (Dag)            => { exp!(@kw, Dag,        KwDag) };
     (Else)           => { exp!(@kw, Else,       KwElse) };
     (Enum)           => { exp!(@kw, Enum,       KwEnum) };
     (Extern)         => { exp!(@kw, Extern,     KwExtern) };

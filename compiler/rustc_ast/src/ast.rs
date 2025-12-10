@@ -3625,12 +3625,13 @@ pub struct FnHeader {
     pub safety: Safety,
     /// The `extern` keyword and corresponding ABI string, if any.
     pub ext: Extern,
+    pub is_dag: bool,
 }
 
 impl FnHeader {
     /// Does this function header have any qualifiers or is it empty?
     pub fn has_qualifiers(&self) -> bool {
-        let Self { safety, coroutine_kind, constness, ext } = self;
+        let Self { safety, coroutine_kind, constness, ext, is_dag:_ } = self;
         matches!(safety, Safety::Unsafe(_))
             || coroutine_kind.is_some()
             || matches!(constness, Const::Yes(_))
@@ -3645,6 +3646,7 @@ impl Default for FnHeader {
             coroutine_kind: None,
             constness: Const::No,
             ext: Extern::None,
+            is_dag: false,
         }
     }
 }

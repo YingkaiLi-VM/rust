@@ -64,6 +64,7 @@ symbols! {
         Move:               "move",
         Mut:                "mut",
         Pub:                "pub",
+        Dag:                "dag",
         Ref:                "ref",
         Return:             "return",
         SelfLower:          "self",
@@ -136,7 +137,7 @@ symbols! {
         Safe:               "safe",
         Union:              "union",
         Yeet:               "yeet",
-        // tidy-alphabetical-end
+        // tidy-alphabetical-end        
     }
 
     // Pre-interned symbols that can be referred to with `rustc_span::sym::*`.
@@ -154,6 +155,7 @@ symbols! {
     // nice to have.
     Symbols {
         // tidy-alphabetical-start
+        dag_fn,
         Abi,
         AcqRel,
         Acquire,

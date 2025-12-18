@@ -177,6 +177,10 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                 self.format_missing(stmt.span().hi());
             }
             ast::StmtKind::Empty => (),
+            // DAG statements - skip formatting for now
+            ast::StmtKind::DagTask(..) | ast::StmtKind::DagEdge(..) => {
+                self.format_missing(stmt.span().hi());
+            }
         }
     }
 

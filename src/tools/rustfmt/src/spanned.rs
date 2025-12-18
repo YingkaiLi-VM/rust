@@ -76,6 +76,8 @@ impl Spanned for ast::Stmt {
                 }
             }
             ast::StmtKind::Empty => self.span,
+            ast::StmtKind::DagTask(ref dag_task) => mk_sp(dag_task.span.lo(), self.span.hi()),
+            ast::StmtKind::DagEdge(ref dag_edge) => mk_sp(dag_edge.span.lo(), self.span.hi()),
         }
     }
 }

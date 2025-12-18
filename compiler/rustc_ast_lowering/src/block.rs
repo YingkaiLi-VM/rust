@@ -1,4 +1,4 @@
-use rustc_ast::{Block, BlockCheckMode, DagEdge, DagTask, Local, LocalKind, Stmt, StmtKind};
+use rustc_ast::{Block, BlockCheckMode, Local, LocalKind, Stmt, StmtKind};
 use rustc_hir as hir;
 use rustc_hir::Target;
 use rustc_span::sym;

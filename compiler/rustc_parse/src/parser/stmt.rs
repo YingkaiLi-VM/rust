@@ -1236,7 +1236,7 @@ impl<'a> Parser<'a> {
         // Check if this is a function call
         if self.check(exp!(OpenParen)) {
             // Parse function call arguments
-            let args = self.parse_expr_paren_seq()?;
+            let (args, _) = self.parse_paren_comma_seq(|p| p.parse_expr())?;
             expr = self.mk_expr(lo.to(self.prev_token.span), ExprKind::Call(expr, args));
         }
         

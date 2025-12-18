@@ -606,7 +606,7 @@ impl<'v> ast_visit::Visitor<'v> for StatCollector<'v> {
     fn visit_stmt(&mut self, s: &'v ast::Stmt) {
         record_variants!(
             (self, s, s.kind, None, ast, Stmt, StmtKind),
-            [Let, Item, Expr, Semi, Empty, MacCall]
+            [Let, Item, Expr, Semi, Empty, MacCall, DagTask, DagEdge]
         );
         ast_visit::walk_stmt(self, s)
     }

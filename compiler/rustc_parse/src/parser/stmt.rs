@@ -1216,13 +1216,19 @@ impl<'a> Parser<'a> {
         })
     }
 
-    /// Check if the current token starts a DAG task statement
+    /// Check if the current token starts a DAG task statement: `task <ident> {`
+    /// We need to look ahead to distinguish from using `task` as a variable name
     pub fn is_dag_task(&self) -> bool {
         self.token.is_keyword(kw::Task)
+            && self.look_ahead(1, |t| t.is_ident())
+            && self.look_ahead(2, |t| *t == token::OpenDelim(Delimiter::Brace))
     }
 
-    /// Check if the current token starts a DAG edge statement
+    /// Check if the current token starts a DAG edge statement: `edge <ident> ->`
+    /// We need to look ahead to distinguish from using `edge` as a variable name
     pub fn is_dag_edge(&self) -> bool {
         self.token.is_keyword(kw::Edge)
+            && self.look_ahead(1, |t| t.is_ident())
+            && self.look_ahead(2, |t| *t == token::RArrow)
     }
 }

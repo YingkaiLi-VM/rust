@@ -135,6 +135,7 @@ impl HasTokens for StmtKind {
             StmtKind::Expr(expr) | StmtKind::Semi(expr) => expr.tokens(),
             StmtKind::Empty => None,
             StmtKind::MacCall(mac) => mac.tokens.as_ref(),
+            StmtKind::DagTask(_) | StmtKind::DagEdge(_) => None,
         }
     }
     fn tokens_mut(&mut self) -> Option<&mut Option<LazyAttrTokenStream>> {
@@ -144,6 +145,7 @@ impl HasTokens for StmtKind {
             StmtKind::Expr(expr) | StmtKind::Semi(expr) => expr.tokens_mut(),
             StmtKind::Empty => None,
             StmtKind::MacCall(mac) => Some(&mut mac.tokens),
+            StmtKind::DagTask(_) | StmtKind::DagEdge(_) => None,
         }
     }
 }
@@ -278,6 +280,7 @@ impl HasAttrs for StmtKind {
             StmtKind::Item(item) => item.attrs(),
             StmtKind::Empty => &[],
             StmtKind::MacCall(mac) => &mac.attrs,
+            StmtKind::DagTask(_) | StmtKind::DagEdge(_) => &[],
         }
     }
 
@@ -288,6 +291,7 @@ impl HasAttrs for StmtKind {
             StmtKind::Item(item) => item.visit_attrs(f),
             StmtKind::Empty => {}
             StmtKind::MacCall(mac) => f(&mut mac.attrs),
+            StmtKind::DagTask(_) | StmtKind::DagEdge(_) => {}
         }
     }
 }

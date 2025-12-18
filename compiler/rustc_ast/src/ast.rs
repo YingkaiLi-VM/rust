@@ -4104,7 +4104,7 @@ pub type ForeignItem = Item<ForeignItemKind>;
 ///     println!("Task A");
 /// }
 /// ```
-#[derive(Clone, Encodable, Decodable, Debug, Walkable)]
+#[derive(Clone, Encodable, Decodable, Debug)]
 pub struct DagTask {
     pub id: NodeId,
     /// The name of the task
@@ -4121,7 +4121,7 @@ pub struct DagTask {
 /// edge A -> B;  // B depends on A
 /// edge A -> C;  // C depends on A
 /// ```
-#[derive(Clone, Encodable, Decodable, Debug, Walkable)]
+#[derive(Clone, Encodable, Decodable, Debug)]
 pub struct DagEdge {
     pub id: NodeId,
     /// The source task (dependency)
@@ -4132,7 +4132,7 @@ pub struct DagEdge {
 }
 
 /// The body of a DAG function, containing tasks and edges.
-#[derive(Clone, Encodable, Decodable, Debug, Walkable)]
+#[derive(Clone, Encodable, Decodable, Debug)]
 pub struct DagBody {
     /// All tasks defined in this DAG function
     pub tasks: ThinVec<DagTask>,

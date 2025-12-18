@@ -1199,14 +1199,14 @@ impl<'a> Parser<'a> {
         let lo = self.token.span;
         self.expect_keyword(exp!(Edge))?;
         
-        // Parse the source expression (can be identifier or function call)
-        let from_expr = self.parse_expr()?;
+        // Parse the source expression (identifier or function call)
+        let from_expr = self.parse_dag_edge_expr()?;
         
         // Expect `->`
         self.expect(exp!(RArrow))?;
         
-        // Parse the target expression (can be identifier or function call)
-        let to_expr = self.parse_expr()?;
+        // Parse the target expression (identifier or function call)
+        let to_expr = self.parse_dag_edge_expr()?;
         
         // Expect `;`
         self.expect(exp!(Semi))?;
@@ -1217,6 +1217,30 @@ impl<'a> Parser<'a> {
             to_expr,
             span: lo.to(self.prev_token.span),
         })
+    }
+
+    /// Parse an expression for DAG edge (identifier or function call).
+    /// This is a limited expression parser that only handles:
+    /// - Simple identifiers: `A`, `fetch_data`
+    /// - Function calls: `task_a(10)`, `task_b(20, 30)`
+    fn parse_dag_edge_expr(&mut self) -> PResult<'a, Box<Expr>> {
+        let lo = self.token.span;
+        
+        // Parse the identifier (function name or task name)
+        let ident = self.parse_ident()?;
+        
+        // Create the initial path expression
+        let path = ast::Path::from_ident(ident);
+        let mut expr = self.mk_expr(lo.to(self.prev_token.span), ExprKind::Path(None, path));
+        
+        // Check if this is a function call
+        if self.check(exp!(OpenParen)) {
+            // Parse function call arguments
+            let args = self.parse_expr_paren_seq()?;
+            expr = self.mk_expr(lo.to(self.prev_token.span), ExprKind::Call(expr, args));
+        }
+        
+        Ok(expr)
     }
 
     /// Check if the current token starts a DAG task statement: `task <ident> {`

@@ -1,4 +1,4 @@
-use rustc_ast::{Block, BlockCheckMode, Local, LocalKind, Stmt, StmtKind};
+use rustc_ast::{self as ast, Block, BlockCheckMode, Local, LocalKind, Stmt, StmtKind};
 use rustc_hir as hir;
 use rustc_hir::Target;
 use rustc_span::sym;
@@ -93,11 +93,30 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
                     let span = self.lower_span(s.span);
                     stmts.push(hir::Stmt { hir_id, kind, span });
                 }
-                StmtKind::DagEdge(_dag_edge) => {
-                    // DAG edges are used for dependency tracking at compile time
-                    // At runtime, they don't generate code directly
-                    // The scheduler uses them to determine execution order
-                    // For now, we skip them (they're handled by the DAG scheduler)
+                StmtKind::DagEdge(dag_edge) => {
+                    // For now, edge statements inside dag functions just define dependencies
+                    // and don't generate runtime code.
+                    // Edge statements outside dag functions (with function calls) will be
+                    // lowered to execute the function calls sequentially.
+                    // 
+                    // Check if from_expr is a function call - if so, execute both calls
+                    if let ast::ExprKind::Call(_, _) = &dag_edge.from_expr.kind {
+                        // Lower from_expr as a semi statement
+                        let from_hir = self.lower_expr(&dag_edge.from_expr);
+                        let from_hir_id = self.lower_node_id(s.id);
+                        let from_kind = hir::StmtKind::Semi(from_hir);
+                        let from_span = self.lower_span(dag_edge.from_expr.span);
+                        stmts.push(hir::Stmt { hir_id: from_hir_id, kind: from_kind, span: from_span });
+                        
+                        // Lower to_expr as a semi statement
+                        let to_hir = self.lower_expr(&dag_edge.to_expr);
+                        let to_hir_id = self.next_id();
+                        let to_kind = hir::StmtKind::Semi(to_hir);
+                        let to_span = self.lower_span(dag_edge.to_expr.span);
+                        stmts.push(hir::Stmt { hir_id: to_hir_id, kind: to_kind, span: to_span });
+                    }
+                    // For simple identifier edges (inside dag functions), we skip code generation
+                    // as they only define dependency relationships
                 }
             }
             ast_stmts = tail;

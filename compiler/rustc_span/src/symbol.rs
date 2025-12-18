@@ -823,6 +823,7 @@ symbols! {
         custom_test_frameworks,
         d,
         d32,
+        dag_fn,
         dbg_macro,
         dead_code,
         dealloc,

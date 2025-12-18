@@ -87,6 +87,14 @@ impl<'a> Parser<'a> {
                     UsePreAttrPos::No,
                 ))
             })?
+        } else if self.is_dag_task() {
+            // Parse DAG task: `task <name> { ... }`
+            let task = self.parse_dag_task()?;
+            self.mk_stmt(lo.to(self.prev_token.span), StmtKind::DagTask(Box::new(task)))
+        } else if self.is_dag_edge() {
+            // Parse DAG edge: `edge <from> -> <to>;`
+            let edge = self.parse_dag_edge()?;
+            self.mk_stmt(lo.to(self.prev_token.span), StmtKind::DagEdge(Box::new(edge)))
         } else if self.token.is_keyword(kw::Let) {
             self.collect_tokens(None, attrs, force_collect, |this, attrs| {
                 this.expect_keyword(exp!(Let))?;
@@ -1127,7 +1135,8 @@ impl<'a> Parser<'a> {
                 }
                 eat_semi = false;
             }
-            StmtKind::Empty | StmtKind::Item(_) | StmtKind::Let(_) | StmtKind::Semi(_) => {
+            StmtKind::Empty | StmtKind::Item(_) | StmtKind::Let(_) | StmtKind::Semi(_) 
+            | StmtKind::DagTask(_) | StmtKind::DagEdge(_) => {
                 eat_semi = false
             }
         }
@@ -1159,5 +1168,61 @@ impl<'a> Parser<'a> {
 
     pub(super) fn mk_block_err(&self, span: Span, guar: ErrorGuaranteed) -> Box<Block> {
         self.mk_block(thin_vec![self.mk_stmt_err(span, guar)], BlockCheckMode::Default, span)
+    }
+
+    /// Parse a DAG task definition: `task <name> { ... }`
+    /// Only valid inside a `dag fn` body.
+    pub fn parse_dag_task(&mut self) -> PResult<'a, ast::DagTask> {
+        let lo = self.token.span;
+        self.expect_keyword(exp!(Task))?;
+        
+        // Parse the task name
+        let ident = self.parse_ident()?;
+        
+        // Parse the task body
+        let body = self.parse_block()?;
+        
+        Ok(ast::DagTask {
+            id: DUMMY_NODE_ID,
+            ident,
+            body,
+            span: lo.to(self.prev_token.span),
+        })
+    }
+
+    /// Parse a DAG edge definition: `edge <from> -> <to>;`
+    /// Only valid inside a `dag fn` body.
+    pub fn parse_dag_edge(&mut self) -> PResult<'a, ast::DagEdge> {
+        let lo = self.token.span;
+        self.expect_keyword(exp!(Edge))?;
+        
+        // Parse the source task name
+        let from = self.parse_ident()?;
+        
+        // Expect `->`
+        self.expect(exp!(RArrow))?;
+        
+        // Parse the target task name
+        let to = self.parse_ident()?;
+        
+        // Expect `;`
+        self.expect(exp!(Semi))?;
+        
+        Ok(ast::DagEdge {
+            id: DUMMY_NODE_ID,
+            from,
+            to,
+            span: lo.to(self.prev_token.span),
+        })
+    }
+
+    /// Check if the current token starts a DAG task statement
+    pub fn is_dag_task(&self) -> bool {
+        self.token.is_keyword(kw::Task)
+    }
+
+    /// Check if the current token starts a DAG edge statement
+    pub fn is_dag_edge(&self) -> bool {
+        self.token.is_keyword(kw::Edge)
     }
 }

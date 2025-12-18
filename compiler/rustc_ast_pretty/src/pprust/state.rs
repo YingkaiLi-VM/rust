@@ -1457,6 +1457,23 @@ impl<'a> State<'a> {
                     self.word(";");
                 }
             }
+            ast::StmtKind::DagTask(dag_task) => {
+                self.space_if_not_bol();
+                self.word("task ");
+                self.print_ident(dag_task.ident);
+                self.word(" ");
+                let cb = self.cbox(INDENT_UNIT);
+                let ib = self.ibox(0);
+                self.print_block(&dag_task.body, cb, ib);
+            }
+            ast::StmtKind::DagEdge(dag_edge) => {
+                self.space_if_not_bol();
+                self.word("edge ");
+                self.print_ident(dag_edge.from);
+                self.word(" -> ");
+                self.print_ident(dag_edge.to);
+                self.word(";");
+            }
         }
         self.maybe_print_trailing_comment(st.span, None)
     }

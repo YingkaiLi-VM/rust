@@ -89,6 +89,7 @@ pub enum TokenType {
     KwDefault,
     KwDag,
     KwDyn,
+    KwEdge,
     KwElse,
     KwEnum,
     KwExtern,
@@ -116,6 +117,7 @@ pub enum TokenType {
     KwStatic,
     KwStruct,
     KwSuper,
+    KwTask,
     KwTrait,
     KwTry,
     KwType,
@@ -226,8 +228,10 @@ impl TokenType {
             KwContractEnsures,
             KwContractRequires,
             KwCrate,
+            KwDag,
             KwDefault,
             KwDyn,
+            KwEdge,
             KwElse,
             KwEnum,
             KwExtern,
@@ -255,6 +259,7 @@ impl TokenType {
             KwStatic,
             KwStruct,
             KwSuper,
+            KwTask,
             KwTrait,
             KwTry,
             KwType,
@@ -302,8 +307,10 @@ impl TokenType {
             TokenType::KwContractEnsures => Some(kw::ContractEnsures),
             TokenType::KwContractRequires => Some(kw::ContractRequires),
             TokenType::KwCrate => Some(kw::Crate),
+            TokenType::KwDag => Some(kw::Dag),
             TokenType::KwDefault => Some(kw::Default),
             TokenType::KwDyn => Some(kw::Dyn),
+            TokenType::KwEdge => Some(kw::Edge),
             TokenType::KwElse => Some(kw::Else),
             TokenType::KwEnum => Some(kw::Enum),
             TokenType::KwExtern => Some(kw::Extern),
@@ -331,6 +338,7 @@ impl TokenType {
             TokenType::KwStatic => Some(kw::Static),
             TokenType::KwStruct => Some(kw::Struct),
             TokenType::KwSuper => Some(kw::Super),
+            TokenType::KwTask => Some(kw::Task),
             TokenType::KwTrait => Some(kw::Trait),
             TokenType::KwTry => Some(kw::Try),
             TokenType::KwType => Some(kw::Type),
@@ -520,6 +528,7 @@ macro_rules! exp {
     (Default)        => { exp!(@kw, Default,    KwDefault) };
     (Dyn)            => { exp!(@kw, Dyn,        KwDyn) };
     (Dag)            => { exp!(@kw, Dag,        KwDag) };
+    (Edge)           => { exp!(@kw, Edge,       KwEdge) };
     (Else)           => { exp!(@kw, Else,       KwElse) };
     (Enum)           => { exp!(@kw, Enum,       KwEnum) };
     (Extern)         => { exp!(@kw, Extern,     KwExtern) };
@@ -547,6 +556,7 @@ macro_rules! exp {
     (Static)         => { exp!(@kw, Static,     KwStatic) };
     (Struct)         => { exp!(@kw, Struct,     KwStruct) };
     (Super)          => { exp!(@kw, Super,      KwSuper) };
+    (Task)           => { exp!(@kw, Task,       KwTask) };
     (Trait)          => { exp!(@kw, Trait,      KwTrait) };
     (Try)            => { exp!(@kw, Try,        KwTry) };
     (Type)           => { exp!(@kw, Type,       KwType) };

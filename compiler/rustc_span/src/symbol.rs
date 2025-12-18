@@ -65,6 +65,7 @@ symbols! {
         Mut:                "mut",
         Pub:                "pub",
         Dag:                "dag",
+        Edge:               "edge",
         Ref:                "ref",
         Return:             "return",
         SelfLower:          "self",
@@ -135,6 +136,7 @@ symbols! {
         Raw:                "raw",
         Reuse:              "reuse",
         Safe:               "safe",
+        Task:               "task",
         Union:              "union",
         Yeet:               "yeet",
         // tidy-alphabetical-end        
@@ -155,7 +157,6 @@ symbols! {
     // nice to have.
     Symbols {
         // tidy-alphabetical-start
-        dag_fn,
         Abi,
         AcqRel,
         Acquire,
@@ -1402,6 +1403,9 @@ symbols! {
         may_dangle,
         may_unwind,
         maybe_uninit,
+        dag,
+        edge,
+        dag_fn,
         maybe_uninit_uninit,
         maybe_uninit_zeroed,
         mem_align_const,

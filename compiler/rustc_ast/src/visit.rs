@@ -1181,6 +1181,20 @@ pub fn walk_stmt<'a, V: Visitor<'a>>(visitor: &mut V, statement: &'a Stmt) -> V:
             walk_list!(visitor, visit_attribute, attrs);
             try_visit!(visitor.visit_mac_call(mac));
         }
+        StmtKind::DagTask(dag_task) => {
+            // Visit the task identifier and body
+            let DagTask { id: task_id, ident, body, span: _ } = &**dag_task;
+            try_visit!(visitor.visit_id(*task_id));
+            try_visit!(visitor.visit_ident(*ident));
+            try_visit!(visitor.visit_block(body));
+        }
+        StmtKind::DagEdge(dag_edge) => {
+            // Visit the edge identifiers
+            let DagEdge { id: edge_id, from, to, span: _ } = &**dag_edge;
+            try_visit!(visitor.visit_id(*edge_id));
+            try_visit!(visitor.visit_ident(*from));
+            try_visit!(visitor.visit_ident(*to));
+        }
     }
     V::Result::output()
 }

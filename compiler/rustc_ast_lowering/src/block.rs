@@ -1,4 +1,4 @@
-use rustc_ast::{Block, BlockCheckMode, Local, LocalKind, Stmt, StmtKind};
+use rustc_ast::{Block, BlockCheckMode, DagEdge, DagTask, Local, LocalKind, Stmt, StmtKind};
 use rustc_hir as hir;
 use rustc_hir::Target;
 use rustc_span::sym;
@@ -78,6 +78,27 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
                 }
                 StmtKind::Empty => {}
                 StmtKind::MacCall(..) => panic!("shouldn't exist here"),
+                StmtKind::DagTask(dag_task) => {
+                    // For now, we lower DAG tasks as their inner block statements
+                    // In a full implementation, these would be collected and scheduled
+                    let task_block = self.lower_block(&dag_task.body, false);
+                    let hir_id = self.lower_node_id(s.id);
+                    // Lower the task body as a block expression
+                    let block_expr = self.arena.alloc(hir::Expr {
+                        hir_id: self.next_id(),
+                        kind: hir::ExprKind::Block(task_block, None),
+                        span: self.lower_span(dag_task.span),
+                    });
+                    let kind = hir::StmtKind::Semi(block_expr);
+                    let span = self.lower_span(s.span);
+                    stmts.push(hir::Stmt { hir_id, kind, span });
+                }
+                StmtKind::DagEdge(_dag_edge) => {
+                    // DAG edges are used for dependency tracking at compile time
+                    // At runtime, they don't generate code directly
+                    // The scheduler uses them to determine execution order
+                    // For now, we skip them (they're handled by the DAG scheduler)
+                }
             }
             ast_stmts = tail;
         }

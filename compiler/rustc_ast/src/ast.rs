@@ -1257,6 +1257,12 @@ pub enum StmtKind {
     Empty,
     /// Macro.
     MacCall(Box<MacCallStmt>),
+    /// A DAG task definition (only valid inside dag fn).
+    /// Example: `task A { ... }`
+    DagTask(Box<DagTask>),
+    /// A DAG edge definition (only valid inside dag fn).
+    /// Example: `edge A -> B;`
+    DagEdge(Box<DagEdge>),
 }
 
 #[derive(Clone, Encodable, Decodable, Debug, Walkable)]
@@ -4085,6 +4091,87 @@ impl TryFrom<ItemKind> for ForeignItemKind {
 }
 
 pub type ForeignItem = Item<ForeignItemKind>;
+
+// ============================================================================
+// DAG Function Support
+// ============================================================================
+
+/// A task definition within a DAG function body.
+/// 
+/// Example:
+/// ```ignore
+/// task A {
+///     println!("Task A");
+/// }
+/// ```
+#[derive(Clone, Encodable, Decodable, Debug, Walkable)]
+pub struct DagTask {
+    pub id: NodeId,
+    /// The name of the task
+    pub ident: Ident,
+    /// The body of the task
+    pub body: Box<Block>,
+    pub span: Span,
+}
+
+/// An edge definition within a DAG function body.
+/// 
+/// Example:
+/// ```ignore
+/// edge A -> B;  // B depends on A
+/// edge A -> C;  // C depends on A
+/// ```
+#[derive(Clone, Encodable, Decodable, Debug, Walkable)]
+pub struct DagEdge {
+    pub id: NodeId,
+    /// The source task (dependency)
+    pub from: Ident,
+    /// The target task (dependent)
+    pub to: Ident,
+    pub span: Span,
+}
+
+/// The body of a DAG function, containing tasks and edges.
+#[derive(Clone, Encodable, Decodable, Debug, Walkable)]
+pub struct DagBody {
+    /// All tasks defined in this DAG function
+    pub tasks: ThinVec<DagTask>,
+    /// All edges (dependencies) defined in this DAG function
+    pub edges: ThinVec<DagEdge>,
+    /// The span of the DAG body
+    pub span: Span,
+}
+
+impl DagBody {
+    /// Create a new empty DAG body
+    pub fn new(span: Span) -> Self {
+        DagBody {
+            tasks: ThinVec::new(),
+            edges: ThinVec::new(),
+            span,
+        }
+    }
+
+    /// Add a task to the DAG
+    pub fn add_task(&mut self, task: DagTask) {
+        self.tasks.push(task);
+    }
+
+    /// Add an edge to the DAG
+    pub fn add_edge(&mut self, edge: DagEdge) {
+        self.edges.push(edge);
+    }
+
+    /// Get all task names
+    pub fn task_names(&self) -> Vec<Symbol> {
+        self.tasks.iter().map(|t| t.ident.name).collect()
+    }
+
+    /// Check if a task exists
+    pub fn has_task(&self, name: Symbol) -> bool {
+        self.tasks.iter().any(|t| t.ident.name == name)
+    }
+}
 
 // Some nodes are used a lot. Make sure they don't unintentionally get bigger.
 #[cfg(target_pointer_width = "64")]

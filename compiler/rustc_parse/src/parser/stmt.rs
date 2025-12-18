@@ -1221,7 +1221,7 @@ impl<'a> Parser<'a> {
     pub fn is_dag_task(&self) -> bool {
         self.token.is_keyword(kw::Task)
             && self.look_ahead(1, |t| t.is_ident())
-            && self.look_ahead(2, |t| *t == token::OpenDelim(Delimiter::Brace))
+            && self.look_ahead(2, |t| *t == token::OpenBrace)
     }
 
     /// Check if the current token starts a DAG edge statement: `edge <ident> ->`

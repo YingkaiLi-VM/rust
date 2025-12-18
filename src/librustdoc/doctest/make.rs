@@ -598,6 +598,8 @@ fn parse_source(
                         has_non_items = true;
                     }
                     StmtKind::Let(_) | StmtKind::Semi(_) | StmtKind::Empty => has_non_items = true,
+                    // DAG statements are treated as non-item statements
+                    StmtKind::DagTask(_) | StmtKind::DagEdge(_) => has_non_items = true,
                 }
 
                 // Weirdly enough, the `Stmt` span doesn't include its attributes, so we need to

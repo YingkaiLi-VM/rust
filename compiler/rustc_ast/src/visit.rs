@@ -485,6 +485,9 @@ macro_rules! common_visitor_and_walkers {
             WhereEqPredicate,
             WhereRegionPredicate,
             YieldKind,
+            DagTask,
+            DagEdge,
+            DagBody,
         );
 
         /// Each method of this trait is a hook to be potentially
@@ -1060,6 +1063,29 @@ macro_rules! common_visitor_and_walkers {
                 ExprKind::Dummy => {}
             }
 
+            visit_span(vis, span)
+        });
+
+        impl_walkable!(|&$($mut)? $($lt)? self: DagTask, vis: &mut V| {
+            let DagTask { id, ident, body, span } = self;
+            visit_visitable!($($mut)? vis, id, ident, body, span);
+            V::Result::output()
+        });
+
+        impl_walkable!(|&$($mut)? $($lt)? self: DagEdge, vis: &mut V| {
+            let DagEdge { id, from, to, span } = self;
+            visit_visitable!($($mut)? vis, id, from, to, span);
+            V::Result::output()
+        });
+
+        impl_walkable!(|&$($mut)? $($lt)? self: DagBody, vis: &mut V| {
+            let DagBody { tasks, edges, span } = self;
+            for task in tasks {
+                visit_visitable!($($mut)? vis, task);
+            }
+            for edge in edges {
+                visit_visitable!($($mut)? vis, edge);
+            }
             visit_span(vis, span)
         });
 

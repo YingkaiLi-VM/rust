@@ -1213,8 +1213,8 @@ impl<'a> Parser<'a> {
         
         Ok(ast::DagEdge {
             id: DUMMY_NODE_ID,
-            from_expr: Box::new(from_expr),
-            to_expr: Box::new(to_expr),
+            from_expr,
+            to_expr,
             span: lo.to(self.prev_token.span),
         })
     }

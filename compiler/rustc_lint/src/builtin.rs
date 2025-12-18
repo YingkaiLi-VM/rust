@@ -863,7 +863,9 @@ impl EarlyLintPass for UnusedDocComment {
             ast::StmtKind::Empty
             | ast::StmtKind::Semi(_)
             | ast::StmtKind::Expr(_)
-            | ast::StmtKind::MacCall(_) => return,
+            | ast::StmtKind::MacCall(_)
+            | ast::StmtKind::DagTask(_)
+            | ast::StmtKind::DagEdge(_) => return,
         };
 
         warn_if_doc(cx, stmt.span, kind, stmt.kind.attrs());

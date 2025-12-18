@@ -1469,9 +1469,9 @@ impl<'a> State<'a> {
             ast::StmtKind::DagEdge(dag_edge) => {
                 self.space_if_not_bol();
                 self.word("edge ");
-                self.print_ident(dag_edge.from);
+                self.print_expr(&dag_edge.from_expr);
                 self.word(" -> ");
-                self.print_ident(dag_edge.to);
+                self.print_expr(&dag_edge.to_expr);
                 self.word(";");
             }
         }

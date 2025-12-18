@@ -1073,8 +1073,8 @@ macro_rules! common_visitor_and_walkers {
         });
 
         impl_walkable!(|&$($mut)? $($lt)? self: DagEdge, vis: &mut V| {
-            let DagEdge { id, from, to, span } = self;
-            visit_visitable!($($mut)? vis, id, from, to, span);
+            let DagEdge { id, from_expr, to_expr, span } = self;
+            visit_visitable!($($mut)? vis, id, from_expr, to_expr, span);
             V::Result::output()
         });
 
@@ -1215,11 +1215,11 @@ pub fn walk_stmt<'a, V: Visitor<'a>>(visitor: &mut V, statement: &'a Stmt) -> V:
             try_visit!(visitor.visit_block(body));
         }
         StmtKind::DagEdge(dag_edge) => {
-            // Visit the edge identifiers
-            let DagEdge { id: edge_id, from, to, span: _ } = &**dag_edge;
+            // Visit the edge expressions
+            let DagEdge { id: edge_id, from_expr, to_expr, span: _ } = &**dag_edge;
             try_visit!(visitor.visit_id(*edge_id));
-            try_visit!(visitor.visit_ident(from));
-            try_visit!(visitor.visit_ident(to));
+            try_visit!(visitor.visit_expr(from_expr));
+            try_visit!(visitor.visit_expr(to_expr));
         }
     }
     V::Result::output()

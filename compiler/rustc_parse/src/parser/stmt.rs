@@ -1190,28 +1190,31 @@ impl<'a> Parser<'a> {
         })
     }
 
-    /// Parse a DAG edge definition: `edge <from> -> <to>;`
-    /// Only valid inside a `dag fn` body.
+    /// Parse a DAG edge definition: `edge <expr> -> <expr>;`
+    /// Supports both simple identifiers and function calls with arguments.
+    /// Examples:
+    ///   edge A -> B;
+    ///   edge task_a(10) -> task_b(20, 30);
     pub fn parse_dag_edge(&mut self) -> PResult<'a, ast::DagEdge> {
         let lo = self.token.span;
         self.expect_keyword(exp!(Edge))?;
         
-        // Parse the source task name
-        let from = self.parse_ident()?;
+        // Parse the source expression (can be identifier or function call)
+        let from_expr = self.parse_expr()?;
         
         // Expect `->`
         self.expect(exp!(RArrow))?;
         
-        // Parse the target task name
-        let to = self.parse_ident()?;
+        // Parse the target expression (can be identifier or function call)
+        let to_expr = self.parse_expr()?;
         
         // Expect `;`
         self.expect(exp!(Semi))?;
         
         Ok(ast::DagEdge {
             id: DUMMY_NODE_ID,
-            from,
-            to,
+            from_expr: Box::new(from_expr),
+            to_expr: Box::new(to_expr),
             span: lo.to(self.prev_token.span),
         })
     }
@@ -1224,11 +1227,23 @@ impl<'a> Parser<'a> {
             && self.look_ahead(2, |t| *t == token::OpenBrace)
     }
 
-    /// Check if the current token starts a DAG edge statement: `edge <ident> ->`
-    /// We need to look ahead to distinguish from using `edge` as a variable name
+    /// Check if the current token starts a DAG edge statement.
+    /// Supports two forms:
+    /// 1. `edge A -> B;` (simple identifiers, for internal task references)
+    /// 2. `edge func(args) -> func(args);` (function calls, for chaining dag fns)
+    /// 
+    /// We distinguish from `edge` as a variable by checking:
+    /// - `edge <ident> ->` pattern (simple form)
+    /// - `edge <ident>(` pattern (function call form)
     pub fn is_dag_edge(&self) -> bool {
-        self.token.is_keyword(kw::Edge)
-            && self.look_ahead(1, |t| t.is_ident())
-            && self.look_ahead(2, |t| *t == token::RArrow)
+        if !self.token.is_keyword(kw::Edge) {
+            return false;
+        }
+        // Must be followed by an identifier
+        if !self.look_ahead(1, |t| t.is_ident()) {
+            return false;
+        }
+        // Then either `->` (simple form) or `(` (function call form)
+        self.look_ahead(2, |t| *t == token::RArrow || *t == token::OpenParen)
     }
 }

@@ -4114,20 +4114,20 @@ pub struct DagTask {
     pub span: Span,
 }
 
-/// An edge definition within a DAG function body.
+/// An edge definition that connects DAG function calls.
 /// 
 /// Example:
 /// ```ignore
-/// edge A -> B;  // B depends on A
-/// edge A -> C;  // C depends on A
+/// edge task_a(10) -> task_b(20);  // Execute task_a, then task_b
+/// edge A -> B;  // Simple form: B depends on A
 /// ```
 #[derive(Clone, Encodable, Decodable, Debug)]
 pub struct DagEdge {
     pub id: NodeId,
-    /// The source task (dependency)
-    pub from: Ident,
-    /// The target task (dependent)
-    pub to: Ident,
+    /// The source task call (executed first)
+    pub from_expr: Box<Expr>,
+    /// The target task call (executed after source)
+    pub to_expr: Box<Expr>,
     pub span: Span,
 }
 

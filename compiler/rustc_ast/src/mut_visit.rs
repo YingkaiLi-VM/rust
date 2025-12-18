@@ -389,10 +389,10 @@ fn walk_flat_map_stmt_kind<T: MutVisitor>(vis: &mut T, kind: StmtKind) -> SmallV
             smallvec![StmtKind::DagTask(dag_task)]
         }
         StmtKind::DagEdge(mut dag_edge) => {
-            let DagEdge { id, from, to, span } = dag_edge.deref_mut();
+            let DagEdge { id, from_expr, to_expr, span } = dag_edge.deref_mut();
             vis.visit_id(id);
-            vis.visit_ident(from);
-            vis.visit_ident(to);
+            vis.visit_expr(from_expr);
+            vis.visit_expr(to_expr);
             vis.visit_span(span);
             smallvec![StmtKind::DagEdge(dag_edge)]
         }

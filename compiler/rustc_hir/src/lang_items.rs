@@ -447,7 +447,6 @@ language_item_table! {
     Reborrow,                sym::reborrow,            reborrow,                   Target::Trait,          GenericRequirement::Exact(0);
     CoerceShared,            sym::coerce_shared,       coerce_shared,              Target::Trait,          GenericRequirement::Exact(0);
 
-    // DAG parallel execution lang-items
     ThreadScope,             sym::thread_scope,        thread_scope_fn,            Target::Fn,             GenericRequirement::None;
     ThreadScopeSpawn,        sym::thread_scope_spawn,  thread_scope_spawn_fn,      Target::Method(MethodKind::Inherent), GenericRequirement::None;
 }

@@ -35,12 +35,10 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
         let mut stmts = SmallVec::<[hir::Stmt<'hir>; 8]>::new();
         let mut expr = None;
         
-        // Collect DAG tasks and edges for parallel execution
         let mut dag_tasks: FxHashMap<Symbol, &ast::DagTask> = FxHashMap::default();
         let mut dag_edges: Vec<(Symbol, Symbol)> = Vec::new();
         let mut has_dag_content = false;
         
-        // First pass: collect all DAG tasks and edges
         for s in ast_stmts {
             match &s.kind {
                 StmtKind::DagTask(dag_task) => {
@@ -48,7 +46,6 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
                     has_dag_content = true;
                 }
                 StmtKind::DagEdge(dag_edge) => {
-                    // Only collect edges with simple identifiers (internal task references)
                     if let ast::ExprKind::Path(None, ref from_path) = dag_edge.from_expr.kind {
                         if let ast::ExprKind::Path(None, ref to_path) = dag_edge.to_expr.kind {
                             if from_path.segments.len() == 1 && to_path.segments.len() == 1 {
@@ -64,16 +61,13 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
             }
         }
         
-        // If we have DAG content, generate parallel execution code
         if has_dag_content && !dag_tasks.is_empty() {
             let parallel_stmts = self.lower_dag_parallel(&dag_tasks, &dag_edges, ast_stmts);
             stmts.extend(parallel_stmts);
             
-            // Process remaining non-DAG statements
             while let [s, tail @ ..] = ast_stmts {
                 match &s.kind {
                     StmtKind::DagTask(_) | StmtKind::DagEdge(_) => {
-                        // Already processed
                     }
                     _ => {
                         let lowered = self.lower_single_stmt(s, tail.is_empty());
@@ -93,7 +87,6 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
                 ast_stmts = tail;
             }
         } else {
-            // No DAG content, use original logic
             while let [s, tail @ ..] = ast_stmts {
                 self.lower_stmt_into(&mut stmts, &mut expr, s, tail.is_empty());
                 ast_stmts = tail;
@@ -147,7 +140,6 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
     ) -> Vec<hir::Stmt<'hir>> {
         let mut result_stmts = Vec::new();
         
-        // Build dependency graph
         let mut in_degree: FxHashMap<Symbol, usize> = FxHashMap::default();
         let mut dependents: FxHashMap<Symbol, Vec<Symbol>> = FxHashMap::default();
         
@@ -163,7 +155,6 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
             }
         }
         
-        // Topological sort into levels (tasks in same level can run in parallel)
         let mut levels: Vec<Vec<Symbol>> = Vec::new();
         let mut remaining = in_degree.clone();
         
@@ -192,9 +183,6 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
             levels.push(level);
         }
         
-        // Generate code for each level
-        // For now, execute tasks sequentially even within the same level
-        // True parallel execution with thread::scope requires more complex HIR generation
         for level in levels {
             for task_name in level {
                 if let Some(dag_task) = dag_tasks.get(&task_name) {

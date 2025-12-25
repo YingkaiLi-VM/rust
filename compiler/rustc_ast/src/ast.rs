@@ -1257,11 +1257,7 @@ pub enum StmtKind {
     Empty,
     /// Macro.
     MacCall(Box<MacCallStmt>),
-    /// A DAG task definition (only valid inside dag fn).
-    /// Example: `task A { ... }`
     DagTask(Box<DagTask>),
-    /// A DAG edge definition (only valid inside dag fn).
-    /// Example: `edge A -> B;`
     DagEdge(Box<DagEdge>),
 }
 
@@ -4092,58 +4088,30 @@ impl TryFrom<ItemKind> for ForeignItemKind {
 
 pub type ForeignItem = Item<ForeignItemKind>;
 
-// ============================================================================
-// DAG Function Support
-// ============================================================================
-
-/// A task definition within a DAG function body.
-/// 
-/// Example:
-/// ```ignore
-/// task A {
-///     println!("Task A");
-/// }
-/// ```
 #[derive(Clone, Encodable, Decodable, Debug)]
 pub struct DagTask {
     pub id: NodeId,
-    /// The name of the task
     pub ident: Ident,
-    /// The body of the task
     pub body: Box<Block>,
     pub span: Span,
 }
 
-/// An edge definition that connects DAG function calls.
-/// 
-/// Example:
-/// ```ignore
-/// edge task_a(10) -> task_b(20);  // Execute task_a, then task_b
-/// edge A -> B;  // Simple form: B depends on A
-/// ```
 #[derive(Clone, Encodable, Decodable, Debug)]
 pub struct DagEdge {
     pub id: NodeId,
-    /// The source task call (executed first)
     pub from_expr: Box<Expr>,
-    /// The target task call (executed after source)
     pub to_expr: Box<Expr>,
     pub span: Span,
 }
 
-/// The body of a DAG function, containing tasks and edges.
 #[derive(Clone, Encodable, Decodable, Debug)]
 pub struct DagBody {
-    /// All tasks defined in this DAG function
     pub tasks: ThinVec<DagTask>,
-    /// All edges (dependencies) defined in this DAG function
     pub edges: ThinVec<DagEdge>,
-    /// The span of the DAG body
     pub span: Span,
 }
 
 impl DagBody {
-    /// Create a new empty DAG body
     pub fn new(span: Span) -> Self {
         DagBody {
             tasks: ThinVec::new(),
@@ -4152,12 +4120,10 @@ impl DagBody {
         }
     }
 
-    /// Add a task to the DAG
     pub fn add_task(&mut self, task: DagTask) {
         self.tasks.push(task);
     }
 
-    /// Add an edge to the DAG
     pub fn add_edge(&mut self, edge: DagEdge) {
         self.edges.push(edge);
     }

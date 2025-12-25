@@ -88,11 +88,9 @@ impl<'a> Parser<'a> {
                 ))
             })?
         } else if self.is_dag_task() {
-            // Parse DAG task: `task <name> { ... }`
             let task = self.parse_dag_task()?;
             self.mk_stmt(lo.to(self.prev_token.span), StmtKind::DagTask(Box::new(task)))
         } else if self.is_dag_edge() {
-            // Parse DAG edge: `edge <from> -> <to>;`
             let edge = self.parse_dag_edge()?;
             self.mk_stmt(lo.to(self.prev_token.span), StmtKind::DagEdge(Box::new(edge)))
         } else if self.token.is_keyword(kw::Let) {
@@ -1170,16 +1168,12 @@ impl<'a> Parser<'a> {
         self.mk_block(thin_vec![self.mk_stmt_err(span, guar)], BlockCheckMode::Default, span)
     }
 
-    /// Parse a DAG task definition: `task <name> { ... }`
-    /// Only valid inside a `dag fn` body.
     pub fn parse_dag_task(&mut self) -> PResult<'a, ast::DagTask> {
         let lo = self.token.span;
         self.expect_keyword(exp!(Task))?;
         
-        // Parse the task name
         let ident = self.parse_ident()?;
         
-        // Parse the task body
         let body = self.parse_block()?;
         
         Ok(ast::DagTask {
@@ -1190,21 +1184,16 @@ impl<'a> Parser<'a> {
         })
     }
 
-    /// Parse a DAG edge definition: `edge <expr> -> <expr>;`
     pub fn parse_dag_edge(&mut self) -> PResult<'a, ast::DagEdge> {
         let lo = self.token.span;
         self.expect_keyword(exp!(Edge))?;
         
-        // Parse the source expression (identifier or function call)
         let from_expr = self.parse_dag_edge_expr()?;
         
-        // Expect `->`
         self.expect(exp!(RArrow))?;
         
-        // Parse the target expression (identifier or function call)
         let to_expr = self.parse_dag_edge_expr()?;
         
-        // Expect `;`
         self.expect(exp!(Semi))?;
         
         Ok(ast::DagEdge {
@@ -1215,20 +1204,15 @@ impl<'a> Parser<'a> {
         })
     }
 
-    /// Parse an expression for DAG edge (identifier or function call).
     fn parse_dag_edge_expr(&mut self) -> PResult<'a, Box<Expr>> {
         let lo = self.token.span;
         
-        // Parse the identifier (function name or task name)
         let ident = self.parse_ident()?;
         
-        // Create the initial path expression
         let path = ast::Path::from_ident(ident);
         let mut expr = self.mk_expr(lo.to(self.prev_token.span), ExprKind::Path(None, path));
         
-        // Check if this is a function call
         if self.check(exp!(OpenParen)) {
-            // Parse function call arguments
             let (args, _) = self.parse_paren_comma_seq(|p| p.parse_expr())?;
             expr = self.mk_expr(lo.to(self.prev_token.span), ExprKind::Call(expr, args));
         }
@@ -1236,31 +1220,20 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    /// Check if the current token starts a DAG task statement: `task <ident> {`
-    /// We need to look ahead to distinguish from using `task` as a variable name
     pub fn is_dag_task(&self) -> bool {
         self.token.is_keyword(kw::Task)
             && self.look_ahead(1, |t| t.is_ident())
             && self.look_ahead(2, |t| *t == token::OpenBrace)
     }
 
-    /// Check if the current token starts a DAG edge statement.
-    /// Supports two forms:
-    /// 1. `edge A -> B;` (simple identifiers, for internal task references)
-    /// 2. `edge func(args) -> func(args);` (function calls, for chaining dag fns)
-    /// 
-    /// We distinguish from `edge` as a variable by checking:
-    /// - `edge <ident> ->` pattern (simple form)
-    /// - `edge <ident>(` pattern (function call form)
     pub fn is_dag_edge(&self) -> bool {
         if !self.token.is_keyword(kw::Edge) {
             return false;
         }
-        // Must be followed by an identifier
         if !self.look_ahead(1, |t| t.is_ident()) {
             return false;
         }
-        // Then either `->` (simple form) or `(` (function call form)
         self.look_ahead(2, |t| *t == token::RArrow || *t == token::OpenParen)
     }
 }
+

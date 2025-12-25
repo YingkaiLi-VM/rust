@@ -391,7 +391,6 @@ fn walk_flat_map_stmt_kind<T: MutVisitor>(vis: &mut T, kind: StmtKind) -> SmallV
         StmtKind::DagEdge(mut dag_edge) => {
             let DagEdge { id, from_expr, to_expr, span } = dag_edge.deref_mut();
             vis.visit_id(id);
-            // Only visit expressions that are function calls (not simple task references)
             if matches!(from_expr.kind, ExprKind::Call(_, _)) {
                 vis.visit_expr(from_expr);
             }

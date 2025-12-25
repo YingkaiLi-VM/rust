@@ -1208,19 +1208,14 @@ pub fn walk_stmt<'a, V: Visitor<'a>>(visitor: &mut V, statement: &'a Stmt) -> V:
             try_visit!(visitor.visit_mac_call(mac));
         }
         StmtKind::DagTask(dag_task) => {
-            // Visit the task identifier and body
             let DagTask { id: task_id, ident, body, span: _ } = &**dag_task;
             try_visit!(visitor.visit_id(*task_id));
             try_visit!(visitor.visit_ident(ident));
             try_visit!(visitor.visit_block(body));
         }
         StmtKind::DagEdge(dag_edge) => {
-            // Visit the edge expressions, but only if they are function calls
-            // Simple identifiers (task references inside dag functions) are skipped
-            // to avoid name resolution errors
             let DagEdge { id: edge_id, from_expr, to_expr, span: _ } = &**dag_edge;
             try_visit!(visitor.visit_id(*edge_id));
-            // Only visit expressions that are function calls (not simple task references)
             if matches!(from_expr.kind, ExprKind::Call(_, _)) {
                 try_visit!(visitor.visit_expr(from_expr));
             }

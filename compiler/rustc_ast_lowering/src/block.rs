@@ -79,8 +79,6 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
                 StmtKind::Empty => {}
                 StmtKind::MacCall(..) => panic!("shouldn't exist here"),
                 StmtKind::DagTask(dag_task) => {
-                    // For now, we lower DAG tasks as their inner block statements
-                    // In a full implementation, these would be collected and scheduled
                     let task_block = self.lower_block(&dag_task.body, false);
                     let hir_id = self.lower_node_id(s.id);
                     // Lower the task body as a block expression
@@ -94,12 +92,6 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
                     stmts.push(hir::Stmt { hir_id, kind, span });
                 }
                 StmtKind::DagEdge(dag_edge) => {
-                    // For now, edge statements inside dag functions just define dependencies
-                    // and don't generate runtime code.
-                    // Edge statements outside dag functions (with function calls) will be
-                    // lowered to execute the function calls sequentially.
-                    // 
-                    // Check if from_expr is a function call - if so, execute both calls
                     if let ast::ExprKind::Call(_, _) = &dag_edge.from_expr.kind {
                         // Lower from_expr as a semi statement
                         let from_hir = self.lower_expr(&dag_edge.from_expr);
@@ -115,8 +107,6 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
                         let to_span = self.lower_span(dag_edge.to_expr.span);
                         stmts.push(hir::Stmt { hir_id: to_hir_id, kind: to_kind, span: to_span });
                     }
-                    // For simple identifier edges (inside dag functions), we skip code generation
-                    // as they only define dependency relationships
                 }
             }
             ast_stmts = tail;

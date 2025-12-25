@@ -1191,10 +1191,6 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse a DAG edge definition: `edge <expr> -> <expr>;`
-    /// Supports both simple identifiers and function calls with arguments.
-    /// Examples:
-    ///   edge A -> B;
-    ///   edge task_a(10) -> task_b(20, 30);
     pub fn parse_dag_edge(&mut self) -> PResult<'a, ast::DagEdge> {
         let lo = self.token.span;
         self.expect_keyword(exp!(Edge))?;
@@ -1220,9 +1216,6 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse an expression for DAG edge (identifier or function call).
-    /// This is a limited expression parser that only handles:
-    /// - Simple identifiers: `A`, `fetch_data`
-    /// - Function calls: `task_a(10)`, `task_b(20, 30)`
     fn parse_dag_edge_expr(&mut self) -> PResult<'a, Box<Expr>> {
         let lo = self.token.span;
         

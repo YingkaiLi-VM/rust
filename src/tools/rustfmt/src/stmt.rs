@@ -137,11 +137,11 @@ fn format_stmt(
                 .max_width_error(shape.width, ex.span())?;
             format_expr(ex, expr_type, context, shape).map(|s| s + suffix)
         }
-        ast::StmtKind::MacCall(..)
-        | ast::StmtKind::Item(..)
-        | ast::StmtKind::Empty
-        | ast::StmtKind::DagTask(..)
-        | ast::StmtKind::DagEdge(..) => Err(RewriteError::Unknown),
+    ast::StmtKind::MacCall(..)
+    | ast::StmtKind::Item(..)
+    | ast::StmtKind::Empty
+    | ast::StmtKind::DagTask(..)
+    | ast::StmtKind::DagEdge(..) => Err(RewriteError::Unknown),
     };
     result.map(|res| recover_comment_removed(res, stmt.span(), context))
 }

@@ -3,7 +3,6 @@ use rustc_hir as hir;
 use rustc_hir::Target;
 use rustc_span::{Ident, sym};
 use smallvec::SmallVec;
-use thin_vec::ThinVec;
 
 use crate::{ImplTraitContext, ImplTraitPosition, LoweringContext};
 
@@ -125,7 +124,7 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
                             
                             if let ast::ExprKind::Call(ref callee, ref args) = dag_edge.to_expr.kind {
                                 let callee_hir = self.lower_expr(callee);
-                                let new_args: Vec<_> = args.iter().map(|arg| {
+                                let new_args: Vec<hir::Expr<'hir>> = args.iter().map(|arg| {
                                     if matches!(arg.kind, ast::ExprKind::Underscore) {
                                         let path = hir::QPath::Resolved(
                                             None,
@@ -137,13 +136,18 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
                                                 ]),
                                             }),
                                         );
-                                        self.arena.alloc(hir::Expr {
+                                        hir::Expr {
                                             hir_id: self.next_id(),
                                             kind: hir::ExprKind::Path(path),
                                             span: edge_span,
-                                        })
+                                        }
                                     } else {
-                                        self.lower_expr(arg)
+                                        let lowered = self.lower_expr(arg);
+                                        hir::Expr {
+                                            hir_id: lowered.hir_id,
+                                            kind: lowered.kind,
+                                            span: lowered.span,
+                                        }
                                     }
                                 }).collect();
                                 

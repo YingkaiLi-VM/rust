@@ -2250,6 +2250,8 @@ symbols! {
         thread,
         thread_local,
         thread_local_macro,
+        thread_scope,
+        thread_scope_spawn,
         three_way_compare,
         thumb2,
         thumb_mode: "thumb-mode",

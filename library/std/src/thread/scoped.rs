@@ -131,6 +131,7 @@ impl ScopeData {
 /// The `'env: 'scope` bound is part of the definition of the `Scope` type.
 #[track_caller]
 #[stable(feature = "scoped_threads", since = "1.63.0")]
+#[lang = "thread_scope"]
 pub fn scope<'env, F, T>(f: F) -> T
 where
     F: for<'scope> FnOnce(&'scope Scope<'scope, 'env>) -> T,
@@ -191,6 +192,7 @@ impl<'scope, 'env> Scope<'scope, 'env> {
     ///
     /// [`join`]: ScopedJoinHandle::join
     #[stable(feature = "scoped_threads", since = "1.63.0")]
+    #[lang = "thread_scope_spawn"]
     pub fn spawn<F, T>(&'scope self, f: F) -> ScopedJoinHandle<'scope, T>
     where
         F: FnOnce() -> T + Send + 'scope,

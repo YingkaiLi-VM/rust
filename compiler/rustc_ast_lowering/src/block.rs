@@ -3,7 +3,7 @@ use rustc_hir as hir;
 use rustc_hir::Target;
 use rustc_span::{Ident, Symbol, sym};
 use smallvec::SmallVec;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use crate::{ImplTraitContext, ImplTraitPosition, LoweringContext};
 
@@ -169,7 +169,7 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
         while !remaining.is_empty() {
             let level: Vec<Symbol> = remaining
                 .iter()
-                .filter(|(_, &deg)| deg == 0)
+                .filter(|&(_, deg)| *deg == 0)
                 .map(|(&name, _)| name)
                 .collect();
             
@@ -368,11 +368,11 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
                 capture_clause: hir::CaptureBy::Ref,
                 bound_generic_params: &[],
                 fn_decl: self.arena.alloc(hir::FnDecl {
-                    inputs: self.arena.alloc_from_iter([self.arena.alloc(hir::Ty {
+                    inputs: self.arena.alloc_from_iter([hir::Ty {
                         hir_id: self.next_id(),
                         kind: hir::TyKind::Infer(()),
                         span,
-                    }) as &hir::Ty<'hir>]),
+                    }]),
                     output: hir::FnRetTy::DefaultReturn(span),
                     c_variadic: false,
                     implicit_self: hir::ImplicitSelfKind::None,

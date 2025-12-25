@@ -193,9 +193,10 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
         }
         
         // Generate code for each level
+        // For now, execute tasks sequentially even within the same level
+        // True parallel execution with thread::scope requires more complex HIR generation
         for level in levels {
-            if level.len() == 1 {
-                let task_name = level[0];
+            for task_name in level {
                 if let Some(dag_task) = dag_tasks.get(&task_name) {
                     let task_block = self.lower_block(&dag_task.body, false);
                     let hir_id = self.next_id();
@@ -208,195 +209,10 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
                     let span = self.lower_span(dag_task.span);
                     result_stmts.push(hir::Stmt { hir_id, kind, span });
                 }
-            } else {
-                // Multiple tasks at same level - generate thread::scope call
-                // Use span from first task in level
-                let first_task = dag_tasks.get(&level[0]).unwrap();
-                let span = self.lower_span(first_task.span);
-                
-                // Collect all task bodies for this level
-                let mut task_bodies: Vec<(&'hir hir::Block<'hir>, rustc_span::Span)> = Vec::new();
-                for task_name in &level {
-                    if let Some(dag_task) = dag_tasks.get(task_name) {
-                        let task_block = self.lower_block(&dag_task.body, false);
-                        task_bodies.push((task_block, self.lower_span(dag_task.span)));
-                    }
-                }
-                
-                // Generate: std::thread::scope(|s| { s.spawn(|| task1); s.spawn(|| task2); });
-                let scope_call = self.make_dag_parallel_scope_call(span, task_bodies);
-                result_stmts.push(hir::Stmt {
-                    hir_id: self.next_id(),
-                    kind: hir::StmtKind::Semi(scope_call),
-                    span,
-                });
             }
         }
         
         result_stmts
-    }
-    
-    fn make_dag_parallel_scope_call(
-        &mut self,
-        span: rustc_span::Span,
-        task_bodies: Vec<(&'hir hir::Block<'hir>, rustc_span::Span)>,
-    ) -> &'hir hir::Expr<'hir> {
-        // Create spawn statements for each task
-        let mut spawn_stmts: Vec<hir::Stmt<'hir>> = Vec::new();
-        
-        let scope_param_ident = Ident::from_str("__dag_s");
-        let (scope_pat, scope_binding_id) = self.pat_ident(span, scope_param_ident);
-        
-        // Store closure def_ids that we'll need
-        let mut inner_closure_def_ids: Vec<_> = Vec::new();
-        for _ in &task_bodies {
-            let closure_node_id = self.next_node_id();
-            inner_closure_def_ids.push(self.local_def_id(closure_node_id));
-        }
-        
-        // Create inner closure bodies first
-        let mut inner_closure_bodies: Vec<_> = Vec::new();
-        for (task_block, task_span) in &task_bodies {
-            let closure_body_expr = hir::Expr {
-                hir_id: self.next_id(),
-                kind: hir::ExprKind::Block(*task_block, None),
-                span: *task_span,
-            };
-            let body_id = self.lower_body(|_this| {
-                (&[], closure_body_expr)
-            });
-            inner_closure_bodies.push(body_id);
-        }
-        
-        // Now create spawn calls
-        for (i, ((_task_block, task_span), body_id)) in task_bodies.iter().zip(inner_closure_bodies.iter()).enumerate() {
-            let inner_closure = self.arena.alloc(hir::Expr {
-                hir_id: self.next_id(),
-                kind: hir::ExprKind::Closure(self.arena.alloc(hir::Closure {
-                    def_id: inner_closure_def_ids[i],
-                    binder: hir::ClosureBinder::Default,
-                    constness: hir::Constness::NotConst,
-                    capture_clause: hir::CaptureBy::Ref,
-                    bound_generic_params: &[],
-                    fn_decl: self.arena.alloc(hir::FnDecl {
-                        inputs: &[],
-                        output: hir::FnRetTy::DefaultReturn(*task_span),
-                        c_variadic: false,
-                        implicit_self: hir::ImplicitSelfKind::None,
-                        lifetime_elision_allowed: true,
-                    }),
-                    body: *body_id,
-                    fn_decl_span: *task_span,
-                    fn_arg_span: None,
-                    kind: hir::ClosureKind::Closure,
-                })),
-                span: *task_span,
-            });
-            
-            // Create scope reference: __dag_s
-            let scope_ref = self.arena.alloc(hir::Expr {
-                hir_id: self.next_id(),
-                kind: hir::ExprKind::Path(hir::QPath::Resolved(
-                    None,
-                    self.arena.alloc(hir::Path {
-                        span,
-                        res: hir::def::Res::Local(scope_binding_id),
-                        segments: self.arena.alloc_from_iter([
-                            hir::PathSegment::new(scope_param_ident, self.next_id(), hir::def::Res::Local(scope_binding_id))
-                        ]),
-                    }),
-                )),
-                span,
-            });
-            
-            // Create method call: __dag_s.spawn(closure)
-            let spawn_ident = Ident::from_str("spawn");
-            let spawn_call = self.arena.alloc(hir::Expr {
-                hir_id: self.next_id(),
-                kind: hir::ExprKind::MethodCall(
-                    self.arena.alloc(hir::PathSegment::new(spawn_ident, self.next_id(), hir::def::Res::Err)),
-                    scope_ref,
-                    std::slice::from_ref(inner_closure),
-                    *task_span,
-                ),
-                span: *task_span,
-            });
-            
-            spawn_stmts.push(hir::Stmt {
-                hir_id: self.next_id(),
-                kind: hir::StmtKind::Semi(spawn_call),
-                span: *task_span,
-            });
-        }
-        
-        // Create outer closure body block
-        let outer_body_block = self.arena.alloc(hir::Block {
-            hir_id: self.next_id(),
-            stmts: self.arena.alloc_from_iter(spawn_stmts),
-            expr: None,
-            rules: hir::BlockCheckMode::DefaultBlock,
-            span,
-            targeted_by_break: false,
-        });
-        
-        let outer_body_expr = hir::Expr {
-            hir_id: self.next_id(),
-            kind: hir::ExprKind::Block(outer_body_block, None),
-            span,
-        };
-        
-        // Create outer closure: |__dag_s| { spawn calls }
-        let outer_closure_node_id = self.next_node_id();
-        let outer_closure_def_id = self.local_def_id(outer_closure_node_id);
-        
-        // Create parameter for outer closure
-        let scope_param_hir_id = self.next_id();
-        let scope_param = self.arena.alloc(hir::Param {
-            hir_id: scope_param_hir_id,
-            pat: scope_pat,
-            ty_span: span,
-            span,
-        });
-        
-        let outer_closure_body = self.lower_body(|_this| {
-            (std::slice::from_ref(scope_param), outer_body_expr)
-        });
-        
-        let outer_closure = self.arena.alloc(hir::Expr {
-            hir_id: self.next_id(),
-            kind: hir::ExprKind::Closure(self.arena.alloc(hir::Closure {
-                def_id: outer_closure_def_id,
-                binder: hir::ClosureBinder::Default,
-                constness: hir::Constness::NotConst,
-                capture_clause: hir::CaptureBy::Ref,
-                bound_generic_params: &[],
-                fn_decl: self.arena.alloc(hir::FnDecl {
-                    inputs: self.arena.alloc_from_iter([hir::Ty {
-                        hir_id: self.next_id(),
-                        kind: hir::TyKind::Infer(()),
-                        span,
-                    }]),
-                    output: hir::FnRetTy::DefaultReturn(span),
-                    c_variadic: false,
-                    implicit_self: hir::ImplicitSelfKind::None,
-                    lifetime_elision_allowed: true,
-                }),
-                body: outer_closure_body,
-                fn_decl_span: span,
-                fn_arg_span: Some(span),
-                kind: hir::ClosureKind::Closure,
-            })),
-            span,
-        });
-        
-        // Call thread::scope with the closure
-        let scope_call = self.expr_call_lang_item_fn(
-            span,
-            hir::LangItem::ThreadScope,
-            std::slice::from_ref(outer_closure),
-        );
-        
-        scope_call
     }
     
     fn lower_stmt_into(

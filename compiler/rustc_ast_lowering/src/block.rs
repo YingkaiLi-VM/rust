@@ -1,9 +1,9 @@
 use rustc_ast::{self as ast, Block, BlockCheckMode, Local, LocalKind, Stmt, StmtKind};
+use rustc_data_structures::fx::FxHashMap;
 use rustc_hir as hir;
 use rustc_hir::Target;
 use rustc_span::{Ident, Symbol, sym};
 use smallvec::SmallVec;
-use std::collections::HashMap;
 
 use crate::{ImplTraitContext, ImplTraitPosition, LoweringContext};
 
@@ -36,7 +36,7 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
         let mut expr = None;
         
         // Collect DAG tasks and edges for parallel execution
-        let mut dag_tasks: HashMap<Symbol, &ast::DagTask> = HashMap::new();
+        let mut dag_tasks: FxHashMap<Symbol, &ast::DagTask> = FxHashMap::default();
         let mut dag_edges: Vec<(Symbol, Symbol)> = Vec::new();
         let mut has_dag_content = false;
         
@@ -138,17 +138,18 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
         }
     }
     
+    #[allow(rustc::potential_query_instability)]
     fn lower_dag_parallel(
         &mut self,
-        dag_tasks: &HashMap<Symbol, &ast::DagTask>,
+        dag_tasks: &FxHashMap<Symbol, &ast::DagTask>,
         dag_edges: &[(Symbol, Symbol)],
         _ast_stmts: &[Stmt],
     ) -> Vec<hir::Stmt<'hir>> {
         let mut result_stmts = Vec::new();
         
         // Build dependency graph
-        let mut in_degree: HashMap<Symbol, usize> = HashMap::new();
-        let mut dependents: HashMap<Symbol, Vec<Symbol>> = HashMap::new();
+        let mut in_degree: FxHashMap<Symbol, usize> = FxHashMap::default();
+        let mut dependents: FxHashMap<Symbol, Vec<Symbol>> = FxHashMap::default();
         
         for name in dag_tasks.keys() {
             in_degree.insert(*name, 0);
@@ -209,7 +210,9 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
                 }
             } else {
                 // Multiple tasks at same level - generate thread::scope call
-                let span = self.lower_span(dag_tasks.values().next().unwrap().span);
+                // Use span from first task in level
+                let first_task = dag_tasks.get(&level[0]).unwrap();
+                let span = self.lower_span(first_task.span);
                 
                 // Collect all task bodies for this level
                 let mut task_bodies: Vec<(&'hir hir::Block<'hir>, rustc_span::Span)> = Vec::new();
@@ -266,7 +269,7 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
         }
         
         // Now create spawn calls
-        for (i, ((task_block, task_span), body_id)) in task_bodies.iter().zip(inner_closure_bodies.iter()).enumerate() {
+        for (i, ((_task_block, task_span), body_id)) in task_bodies.iter().zip(inner_closure_bodies.iter()).enumerate() {
             let inner_closure = self.arena.alloc(hir::Expr {
                 hir_id: self.next_id(),
                 kind: hir::ExprKind::Closure(self.arena.alloc(hir::Closure {

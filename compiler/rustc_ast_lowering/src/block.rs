@@ -1,8 +1,9 @@
 use rustc_ast::{self as ast, Block, BlockCheckMode, Local, LocalKind, Stmt, StmtKind};
 use rustc_hir as hir;
 use rustc_hir::Target;
-use rustc_span::sym;
+use rustc_span::{Ident, sym};
 use smallvec::SmallVec;
+use thin_vec::ThinVec;
 
 use crate::{ImplTraitContext, ImplTraitPosition, LoweringContext};
 
@@ -93,19 +94,84 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
                 }
                 StmtKind::DagEdge(dag_edge) => {
                     if let ast::ExprKind::Call(_, _) = &dag_edge.from_expr.kind {
-                        // Lower from_expr as a semi statement
-                        let from_hir = self.lower_expr(&dag_edge.from_expr);
-                        let from_hir_id = self.lower_node_id(s.id);
-                        let from_kind = hir::StmtKind::Semi(from_hir);
-                        let from_span = self.lower_span(dag_edge.from_expr.span);
-                        stmts.push(hir::Stmt { hir_id: from_hir_id, kind: from_kind, span: from_span });
+                        let edge_span = self.lower_span(dag_edge.span);
                         
-                        // Lower to_expr as a semi statement
-                        let to_hir = self.lower_expr(&dag_edge.to_expr);
-                        let to_hir_id = self.next_id();
-                        let to_kind = hir::StmtKind::Semi(to_hir);
-                        let to_span = self.lower_span(dag_edge.to_expr.span);
-                        stmts.push(hir::Stmt { hir_id: to_hir_id, kind: to_kind, span: to_span });
+                        let has_underscore = if let ast::ExprKind::Call(_, ref args) = dag_edge.to_expr.kind {
+                            args.iter().any(|arg| matches!(arg.kind, ast::ExprKind::Underscore))
+                        } else {
+                            false
+                        };
+                        
+                        if has_underscore {
+                            let from_hir = self.lower_expr(&dag_edge.from_expr);
+                            let result_ident = Ident::from_str("__dag_result");
+                            let (pat, pat_hir_id) = self.pat_ident(edge_span, result_ident);
+                            
+                            let let_stmt = hir::LetStmt {
+                                super_: None,
+                                hir_id: self.lower_node_id(s.id),
+                                init: Some(from_hir),
+                                pat,
+                                els: None,
+                                source: hir::LocalSource::Normal,
+                                span: edge_span,
+                                ty: None,
+                            };
+                            stmts.push(hir::Stmt {
+                                hir_id: self.next_id(),
+                                kind: hir::StmtKind::Let(self.arena.alloc(let_stmt)),
+                                span: edge_span,
+                            });
+                            
+                            if let ast::ExprKind::Call(ref callee, ref args) = dag_edge.to_expr.kind {
+                                let callee_hir = self.lower_expr(callee);
+                                let new_args: Vec<_> = args.iter().map(|arg| {
+                                    if matches!(arg.kind, ast::ExprKind::Underscore) {
+                                        let path = hir::QPath::Resolved(
+                                            None,
+                                            self.arena.alloc(hir::Path {
+                                                span: edge_span,
+                                                res: hir::def::Res::Local(pat_hir_id),
+                                                segments: self.arena.alloc_from_iter([
+                                                    hir::PathSegment::new(result_ident, self.next_id(), hir::def::Res::Local(pat_hir_id))
+                                                ]),
+                                            }),
+                                        );
+                                        self.arena.alloc(hir::Expr {
+                                            hir_id: self.next_id(),
+                                            kind: hir::ExprKind::Path(path),
+                                            span: edge_span,
+                                        })
+                                    } else {
+                                        self.lower_expr(arg)
+                                    }
+                                }).collect();
+                                
+                                let call_expr = self.arena.alloc(hir::Expr {
+                                    hir_id: self.next_id(),
+                                    kind: hir::ExprKind::Call(callee_hir, self.arena.alloc_from_iter(new_args)),
+                                    span: self.lower_span(dag_edge.to_expr.span),
+                                });
+                                
+                                stmts.push(hir::Stmt {
+                                    hir_id: self.next_id(),
+                                    kind: hir::StmtKind::Semi(call_expr),
+                                    span: self.lower_span(dag_edge.to_expr.span),
+                                });
+                            }
+                        } else {
+                            let from_hir = self.lower_expr(&dag_edge.from_expr);
+                            let from_hir_id = self.lower_node_id(s.id);
+                            let from_kind = hir::StmtKind::Semi(from_hir);
+                            let from_span = self.lower_span(dag_edge.from_expr.span);
+                            stmts.push(hir::Stmt { hir_id: from_hir_id, kind: from_kind, span: from_span });
+                            
+                            let to_hir = self.lower_expr(&dag_edge.to_expr);
+                            let to_hir_id = self.next_id();
+                            let to_kind = hir::StmtKind::Semi(to_hir);
+                            let to_span = self.lower_span(dag_edge.to_expr.span);
+                            stmts.push(hir::Stmt { hir_id: to_hir_id, kind: to_kind, span: to_span });
+                        }
                     }
                 }
             }
